@@ -125,13 +125,13 @@ csharp_style_prefer_readonly_struct = true
 csharp_style_prefer_readonly_struct_member = true
 
 # Preferências do bloco de código
-csharp_prefer_braces = true
-csharp_prefer_simple_using_statement = true
-csharp_prefer_system_threading_lock = true
-csharp_style_namespace_declarations = file_scoped:warning
-csharp_style_prefer_method_group_conversion = true
-csharp_style_prefer_primary_constructors = true
-csharp_style_prefer_top_level_statements = true
+csharp_prefer_braces = true:silent
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_prefer_system_threading_lock = true:suggestion
+csharp_style_namespace_declarations = block_scoped:silent
+csharp_style_prefer_method_group_conversion = true:silent
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_prefer_top_level_statements = true:silent
 
 # Preferências de nível de expressão
 csharp_prefer_simple_default_expression = true
@@ -151,7 +151,7 @@ csharp_style_unused_value_assignment_preference = discard_variable
 csharp_style_unused_value_expression_statement_preference = discard_variable
 
 # Preferências da diretiva 'using'
-csharp_using_directive_placement = outside_namespace
+csharp_using_directive_placement = outside_namespace:silent
 
 # Preferências de nova linha
 csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental = true
@@ -254,3 +254,7 @@ dotnet_style_qualification_for_field = false:silent
 dotnet_style_qualification_for_property = false:silent
 dotnet_style_qualification_for_method = false:silent
 dotnet_style_qualification_for_event = false:silent
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+tab_width = 4
+indent_size = 4
+end_of_line = crlf

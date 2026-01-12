@@ -1,0 +1,30 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - fcg-network
+
+  payments-worker:
+    build:
+      context: .
+      dockerfile: FCG.Payments.EventProcessor/Dockerfile
+    image: fcgpayments-worker:latest  
+    environment:
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - fcg-network
+
+networks:
+  fcg-network:
+    driver: bridge
