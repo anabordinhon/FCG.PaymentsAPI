@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-worker
+  labels:
+    app: payments-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-worker
+  template:
+    metadata:
+      labels:
+        app: payments-worker
+    spec:
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - >
+              until nc -z rabbitmq-service 5672;
+              do echo "Aguardando RabbitMQ..."; sleep 3;
+              done;
+              echo "RabbitMQ pronto!"
+      containers:
+        - name: payments-worker
+          image: fcgpayments-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # Host do RabbitMQ (infra do orquestrador)
+            - name: RabbitMQ__Host
+              value: rabbitmq-service
+
+            # Credenciais do RabbitMQ (secret compartilhado do orquestrador)
+            - name: RabbitMQ__Username
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: username
+
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: password
+
+            # Environment do .NET
+            - name: ASPNETCORE_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: payments-worker-config
+                  key: ASPNETCORE_ENVIRONMENT

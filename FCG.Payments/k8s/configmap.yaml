@@ -13,4 +13,4 @@ kind: ConfigMap
 metadata:
   name: payments-worker-config
 data:
-  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_ENVIRONMENT: Deployment

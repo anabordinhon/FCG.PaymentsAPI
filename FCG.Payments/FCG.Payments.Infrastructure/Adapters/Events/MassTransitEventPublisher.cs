@@ -1,7 +1,7 @@
-using FCG.Catalog.Application.Common.Ports;
+using FCG.Payments.Application.Common.Ports;
 using MassTransit;
 
-namespace FCG.Catalog.Infrastructure.Adapters.Events;
+namespace FCG.Payments.Infrastructure.Adapters.Events;
 
 public class MassTransitEventPublisher : IEventPublisher
 {
@@ -14,6 +14,6 @@ public class MassTransitEventPublisher : IEventPublisher
 
     public async Task PublishAsync<T>(T @event, CancellationToken cancellationToken = default) where T : class
     {
-      await _publishEndpoint.Publish(@event, cancellationToken);
+        await _publishEndpoint.Publish(@event, cancellationToken);
     }
 }
