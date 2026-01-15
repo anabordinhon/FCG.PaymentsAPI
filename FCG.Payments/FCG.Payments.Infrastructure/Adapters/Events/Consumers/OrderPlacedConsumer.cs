@@ -3,7 +3,7 @@ using FCG.Payments.Application.Common.Ports;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
-namespace FCG.Catalog.Infrastructure.Adapters.Events.Consumers;
+namespace FCG.Payments.Infrastructure.Adapters.Events.Consumers;
 
 public class OrderPlacedConsumer : IConsumer<OrderPlacedEvent>
 {

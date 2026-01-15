@@ -1,4 +1,6 @@
-using FCG.Catalog.Infrastructure.Adapters.Events.Consumers;
+using FCG.Catalog.Application.Events;
+using FCG.Payments.Domain.Events;
+using FCG.Payments.Infrastructure.Adapters.Events.Consumers;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,22 +19,27 @@ public static class DependencyInjection
 
             x.UsingRabbitMq((context, cfg) =>
             {
-                var rabbitConfig = configuration.GetSection("RabbitMQ");
+                cfg.Host(configuration["RabbitMQ:Host"], "/", h =>
+                {
+                    h.Username(configuration["RabbitMQ:Username"] ?? "guest");
+                    h.Password(configuration["RabbitMQ:Password"] ?? "guest");
+                });
 
-                cfg.Host(
-                    rabbitConfig["Host"] ?? "localhost",
-                    rabbitConfig["VirtualHost"] ?? "/",
-                    h =>
-                    {
-                        h.Username(rabbitConfig["Username"] ?? "guest");
-                        h.Password(rabbitConfig["Password"] ?? "guest");
-                    });
+                cfg.Message<PaymentProcessedEvent>(m =>
+                {
+                    m.SetEntityName("payment-processed");
+                });
 
+                cfg.Message<OrderPlacedEvent>(m =>
+                {
+                    m.SetEntityName("order-placed");
+                });
 
                 cfg.ReceiveEndpoint("order-placed-queue", e =>
                 {
                     e.ConfigureConsumer<OrderPlacedConsumer>(context);
                 });
+
             });
         });
 

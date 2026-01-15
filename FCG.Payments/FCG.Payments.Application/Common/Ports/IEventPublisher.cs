@@ -1,4 +1,4 @@
-namespace FCG.Catalog.Application.Common.Ports;
+namespace FCG.Payments.Application.Common.Ports;
 
 public interface IEventPublisher
 {
