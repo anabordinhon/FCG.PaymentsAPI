@@ -21,7 +21,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "k8s", "k8s", "{02EA681E-C7D
 	ProjectSection(SolutionItems) = preProject
 		k8s\configmap.yaml = k8s\configmap.yaml
 		k8s\deployment.yaml = k8s\deployment.yaml
-		secret-template.yaml = secret-template.yaml
+		k8s\secret-template.yaml = k8s\secret-template.yaml
 		k8s\secret.yaml = k8s\secret.yaml
 	EndProjectSection
 EndProject
