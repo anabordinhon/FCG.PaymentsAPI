@@ -4,6 +4,7 @@ WORKDIR /src
 COPY ["FCG.Payments.EventProcessor/FCG.Payments.EventProcessor.csproj", "FCG.Payments.EventProcessor/"]
 COPY ["FCG.Payments.Application/FCG.Payments.Application.csproj", "FCG.Payments.Application/"]
 COPY ["FCG.Payments.Infrastructure/FCG.Payments.Infrastructure.csproj", "FCG.Payments.Infrastructure/"]
+COPY ["FCG.PAyments.Domain/FCG.PAyments.Domain.csproj", "FCG.PAyments.Domain/"]
 RUN dotnet restore "FCG.Payments.EventProcessor/FCG.Payments.EventProcessor.csproj"
 COPY . .
 RUN dotnet build "FCG.Payments.EventProcessor/FCG.Payments.EventProcessor.csproj" -c $BUILD_CONFIGURATION --no-restore
