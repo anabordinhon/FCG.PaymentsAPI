@@ -1,6 +1,8 @@
 using FCG.Catalog.Application.Events;
+using FCG.Payments.Application.Common.Ports;
 using FCG.Payments.Domain.Events;
 using FCG.Payments.Infrastructure.Adapters.Events.Consumers;
+using FCG.Payments.Infrastructure.Menssaging;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +15,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddScoped<IEventPublisher, SqsEventPublisher>();
+
         services.AddMassTransit(x =>
         {
             x.AddConsumer<OrderPlacedConsumer>();

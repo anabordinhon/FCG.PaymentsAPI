@@ -1,5 +1,6 @@
 using FCG.Catalog.Application.Events;
 using FCG.Payments.Application.Common.Ports;
+using FCG.Payments.Application.Events;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -9,15 +10,18 @@ public class OrderPlacedConsumer : IConsumer<OrderPlacedEvent>
 {
     private readonly IPaymentservice _Paymentservice;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IEventPublisher _eventPublisher;
     private readonly ILogger<OrderPlacedEvent> _logger;
 
     public OrderPlacedConsumer(
-                IPaymentservice Paymentservice,
+        IPaymentservice Paymentservice,
         IPublishEndpoint publishEndpoint,
-               ILogger<OrderPlacedEvent> logger)
+        IEventPublisher eventPublisher,
+        ILogger<OrderPlacedEvent> logger)
     {
         _Paymentservice = Paymentservice;
         _publishEndpoint = publishEndpoint;
+        _eventPublisher = eventPublisher;
         _logger = logger;
     }
 
@@ -36,5 +40,13 @@ public class OrderPlacedConsumer : IConsumer<OrderPlacedEvent>
         _logger.LogInformation(
             "PaymentProcessedEvent publicado - OrderId: {OrderId}, Status: {Status}, UserId: {UserId}, GameId: {GameId},",
             paymentResult.OrderId, paymentResult.Status, orderEvent.UserId, orderEvent.GameId);
+
+        await _eventPublisher.PublishAsync(
+         new NotificationEvent { Type = "payment" },
+         context.CancellationToken);
+
+        _logger.LogInformation(
+            "Notificação 'payment' publicada no SQS - OrderId: {OrderId}",
+            orderEvent.OrderId);
     }
 }
