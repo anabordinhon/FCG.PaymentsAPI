@@ -1,0 +1,45 @@
+name: Deploy Payments EventProcessor to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Payments image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./FCG.Payments
+          file: ./FCG.Payments/FCG.Payments.EventProcessor/Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:latest
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/ubuntu/app
+            docker compose up -d rabbitmq
+            echo "Aguardando RabbitMQ ficar healthy..."
+            sleep 20
+            docker compose pull payments-worker
+            docker compose up -d payments-worker --no-deps
+            docker compose ps
+            docker image prune -f
