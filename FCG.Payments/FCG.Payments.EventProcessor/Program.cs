@@ -1,8 +1,10 @@
 using FCG.Payments.Application;
 using FCG.Payments.Infrastructure;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -21,6 +23,14 @@ var collectorEndpoint = builder.Configuration["OpenTelemetry:CollectorEndpoint"]
 
 builder.Services
     .AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .SetResourceBuilder(
+            ResourceBuilder.CreateDefault()
+                .AddService(serviceName, serviceVersion: serviceVersion))
+        .AddSource("MassTransit")
+        .SetSampler(new AlwaysOnSampler())
+        .AddConsoleExporter()
+    )
     .WithMetrics(metrics => metrics
         .SetResourceBuilder(
             ResourceBuilder.CreateDefault()
@@ -32,7 +42,19 @@ builder.Services
             opts.Endpoint = new Uri(collectorEndpoint);
             opts.Protocol = OtlpExportProtocol.Grpc;
         })
+    )
+    .WithLogging(logging => logging
+        .SetResourceBuilder(
+            ResourceBuilder.CreateDefault()
+                .AddService(serviceName, serviceVersion: serviceVersion))
+        .AddConsoleExporter()
+        .AddOtlpExporter(opts =>
+        {
+            opts.Endpoint = new Uri(collectorEndpoint);
+            opts.Protocol = OtlpExportProtocol.Grpc;
+        })
     );
+
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
