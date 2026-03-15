@@ -3,6 +3,7 @@ using Amazon.SQS.Model;
 using FCG.Payments.Application.Common.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace FCG.Payments.Infrastructure.Menssaging;
@@ -23,12 +24,30 @@ public class SqsEventPublisher : IEventPublisher
 
     public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken) where TEvent : class
     {
+        var traceId = Activity.Current?.TraceId.ToString() ?? "";
+        var spanId = Activity.Current?.SpanId.ToString() ?? "";
+
         var response = await _sqsClient.SendMessageAsync(new SendMessageRequest
         {
             QueueUrl = _queueUrl,
-            MessageBody = JsonSerializer.Serialize(@event)
+            MessageBody = JsonSerializer.Serialize(@event),
+            MessageAttributes = new Dictionary<string, MessageAttributeValue>
+            {
+                ["TraceId"] = new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = traceId
+                },
+                ["SpanId"] = new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = spanId
+                }
+            }
         }, cancellationToken);
 
-        _logger.LogInformation("Mensagem publicada no SQS. MessageId: {MessageId}", response.MessageId);
+        _logger.LogInformation(
+                   "Mensagem publicada no SQS. MessageId: {MessageId}, TraceId: {TraceId}",
+                   response.MessageId, traceId);
     }
 }
