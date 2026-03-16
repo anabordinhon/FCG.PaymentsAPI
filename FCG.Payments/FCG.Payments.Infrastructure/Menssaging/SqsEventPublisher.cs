@@ -25,7 +25,7 @@ public class SqsEventPublisher : IEventPublisher
     public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken) where TEvent : class
     {
         var traceId = Activity.Current?.TraceId.ToString() ?? "";
-        var spanId = Activity.Current?.SpanId.ToString() ?? "";
+        var traceParent = Activity.Current?.Id ?? "";
 
         var response = await _sqsClient.SendMessageAsync(new SendMessageRequest
         {
@@ -33,15 +33,10 @@ public class SqsEventPublisher : IEventPublisher
             MessageBody = JsonSerializer.Serialize(@event),
             MessageAttributes = new Dictionary<string, MessageAttributeValue>
             {
-                ["TraceId"] = new MessageAttributeValue
+                ["traceparent"] = new MessageAttributeValue
                 {
                     DataType = "String",
-                    StringValue = traceId
-                },
-                ["SpanId"] = new MessageAttributeValue
-                {
-                    DataType = "String",
-                    StringValue = spanId
+                    StringValue = traceParent
                 }
             }
         }, cancellationToken);
