@@ -29,6 +29,7 @@ builder.Services
                 .AddService(serviceName, serviceVersion: serviceVersion))
         .AddSource("MassTransit")
         .SetSampler(new AlwaysOnSampler())
+        .AddXRayTraceId()
         .AddConsoleExporter()
     )
     .WithMetrics(metrics => metrics
