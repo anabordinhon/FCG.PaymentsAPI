@@ -45,6 +45,16 @@ spec:
 
           # ─── Secrets ───────────────────────────────────────────────────────
           env:
+            # IP do node onde o pod está rodando — aponta para o CloudWatch Agent DaemonSet
+            # equivalente ao host.docker.internal que funcionava no EC2
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+            - name: OpenTelemetry__CollectorEndpoint
+              value: "http://$(HOST_IP):4317"
+
             - name: RabbitMQ__Username
               valueFrom:
                 secretKeyRef:
@@ -91,23 +101,14 @@ spec:
               memory: "256Mi"
 
           # ─── Health checks ─────────────────────────────────────────────────
-          # Worker sem HTTP: usamos exec para verificar se o processo está vivo
+          # Worker sem endpoint HTTP: sem readinessProbe para nao bloquear o rollout.
+          # O Kubernetes reinicia o container se o processo morrer (exit != 0).
+          # livenessProbe via /proc/1/status funciona em qualquer imagem Linux.
           livenessProbe:
             exec:
               command:
-                - pgrep
-                - -f
-                - FCG.Payments.EventProcessor.dll
+                - cat
+                - /proc/1/status
             initialDelaySeconds: 15
             periodSeconds: 30
-            failureThreshold: 3
-
-          readinessProbe:
-            exec:
-              command:
-                - pgrep
-                - -f
-                - FCG.Payments.EventProcessor.dll
-            initialDelaySeconds: 10
-            periodSeconds: 15
             failureThreshold: 3
