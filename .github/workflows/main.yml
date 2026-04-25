@@ -39,7 +39,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./FCG.Payments
-          file: ./FCG.Payments/Dockerfile
+          file: ./FCG.Payments/FCG.Payments.EventProcessor/Dockerfile
           target: runtime
           push: false
           tags: |
@@ -61,7 +61,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./FCG.Payments
-          file: ./FCG.Payments/Dockerfile
+          file: ./FCG.Payments/FCG.Payments.EventProcessor/Dockerfile
           target: runtime
           push: true
           tags: |
