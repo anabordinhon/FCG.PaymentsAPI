@@ -1,11 +1,27 @@
-name: Deploy Payments EventProcessor to EC2
+name: CI/CD - PaymentsWorker to EKS
 
 on:
   push:
     branches: [ "main" ]
 
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: fcg-eks
+  NAMESPACE: fcg
+  IMAGE_TAG: ${{ github.sha }}
+
+# ─────────────────────────────────────────────────────────────────
+# 2 jobs em sequência: se um falha, o seguinte não executa.
+# Sem testes e sem migrations (projeto mais simples).
+# ─────────────────────────────────────────────────────────────────
+
 jobs:
-  build-and-deploy:
+
+  # ═══════════════════════════════════════════════════════════════
+  # JOB 1 — CONTAINERIZE, SCAN & PUSH
+  # ═══════════════════════════════════════════════════════════════
+  containerize-and-push:
+    name: Containerize, Scan & Push
     runs-on: ubuntu-latest
 
     steps:
@@ -18,28 +34,115 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Payments image
+      # Build com duas tags: latest + hash do commit
+      - name: Build Worker image
         uses: docker/build-push-action@v5
         with:
           context: ./FCG.Payments
-          file: ./FCG.Payments/FCG.Payments.EventProcessor/Dockerfile
+          file: ./FCG.Payments/Dockerfile
+          target: runtime
+          push: false
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:latest
+            ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:${{ env.IMAGE_TAG }}
+          load: true
+
+      # Security scan antes do push — falha o pipeline se encontrar CRITICAL ou HIGH
+      - name: Security scan - Worker image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:${{ env.IMAGE_TAG }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./FCG.Payments
+          file: ./FCG.Payments/Dockerfile
           target: runtime
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:latest
+            ${{ secrets.DOCKER_USERNAME }}/payments-worker-image:${{ env.IMAGE_TAG }}
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.10
+
+  # ═══════════════════════════════════════════════════════════════
+  # JOB 2 — DEPLOY
+  # ═══════════════════════════════════════════════════════════════
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: containerize-and-push
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd /home/ubuntu/app
-            docker compose up -d rabbitmq
-            echo "Aguardando RabbitMQ ficar healthy..."
-            sleep 20
-            docker compose pull payments-worker
-            docker compose up -d payments-worker --no-deps
-            docker compose ps
-            docker image prune -f
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.32.0'
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.EKS_CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Apply namespace and configmap
+        run: |
+          kubectl apply -f FCG.Payments/k8s/payments-namespace.yaml
+          kubectl apply -f FCG.Payments/k8s/payments-configmap.yaml
+
+      # Cria/atualiza o Secret do Kubernetes com os valores do GitHub Secrets.
+      # --dry-run=client | kubectl apply garante idempotência: cria na 1ª vez,
+      # atualiza nas seguintes sem erro.
+      - name: Create or update Kubernetes Secret
+        run: |
+          kubectl create secret generic payments-worker-secret \
+            --namespace=${{ env.NAMESPACE }} \
+            --from-literal=RabbitMQ__Username="${{ secrets.RABBITMQ_USERNAME }}" \
+            --from-literal=RabbitMQ__Password="${{ secrets.RABBITMQ_PASSWORD }}" \
+            --from-literal=AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            --from-literal=AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            --from-literal=AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+            --from-literal=AWS_SQS_QUEUE_URL="${{ secrets.AWS_SQS_QUEUE_URL }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # kubectl apply cria o deployment se não existir (1º deploy),
+      # depois kubectl set image atualiza a tag — acionando o Rolling Update.
+      # maxUnavailable: 0 garante que sempre há 2 pods saudáveis durante o rollout.
+      - name: Deploy application (Rolling Update)
+        run: |
+          kubectl apply -f FCG.Payments/k8s/payments-deployment.yaml
+
+          kubectl set image deployment/payments-worker \
+            payments-worker=${{ secrets.DOCKER_USERNAME }}/payments-worker-image:${{ env.IMAGE_TAG }} \
+            -n ${{ env.NAMESPACE }}
+
+          kubectl rollout status deployment/payments-worker \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=180s
+
+      - name: Show deployment status
+        if: always()
+        run: |
+          echo "========== PODS =========="
+          kubectl get pods -n ${{ env.NAMESPACE }} -o wide
+          echo "========== IMAGEM DEPLOYADA =========="
+          kubectl get deployment payments-worker -n ${{ env.NAMESPACE }} \
+            -o jsonpath='{.spec.template.spec.containers[0].image}'
+          echo ""
+          echo "========== EVENTOS =========="
+          kubectl get events -n ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
